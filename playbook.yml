@@ -178,19 +178,6 @@
         name: pgadmin4
         state: present
 
-    - name: Install SQL-Workbench
-      win_chocolatey:
-        name: sql-workbench
-        state: present
-    - win_file:
-        path: C:\Users\Public\Desktop\SQLWorkbench
-        state: directory
-    - win_shortcut:
-        src: 'C:\ProgramData\chocolatey\bin\SQLWorkbench.exe'
-        dest: 'C:\Users\Public\Desktop\SQLWorkbench\SQLWorkbench.lnk'
-        args: -configDir=C:\Users\Public\.sqlworkbench
-        icon: 'C:\ProgramData\chocolatey\bin\SQLWorkbench.exe'
-
     - name: Download Athena JDBC Driver
       win_get_url:
         url: https://s3.amazonaws.com/athena-downloads/drivers/JDBC/SimbaAthenaJDBC_2.0.7/AthenaJDBC42_2.0.7.jar
@@ -212,6 +199,19 @@
       win_shell: |
         C:\tmp\install\SSMS-Setup-ENU.exe /install /quiet /norestart
 
+    - name: Install SQL-Workbench
+      win_chocolatey:
+        name: sql-workbench
+        state: present
+    - win_file:
+        path: C:\Users\Public\Desktop\SQLWorkbench
+        state: directory
+    - win_shortcut:
+        src: 'C:\ProgramData\chocolatey\bin\SQLWorkbench.exe'
+        dest: 'C:\Users\Public\Desktop\SQLWorkbench\SQLWorkbench.lnk'
+        args: -configDir=C:\Users\Public\.sqlworkbench
+        icon: 'C:\ProgramData\chocolatey\bin\SQLWorkbench.exe'
+
     - name: Unzip Cloudwatch config file
       win_unzip:
         src: C:\tmp\install\AWS.EC2.Windows.Cloudwatch.json.zip
@@ -230,6 +230,11 @@
     - name: Copy sqlworkbench config script
       win_copy:
         src: ./scripts/pull-workbench-conf.py
+        dest: C:\scripts\
+
+    - name: Copy win-updates script
+      win_copy:
+        src: ./scripts/win-updates.ps1
         dest: C:\scripts\
 
     - name: Setup service monitor scheduled task
@@ -253,6 +258,17 @@
         $task.Triggers.Repetition.Duration = "P1D"
         $task.Triggers.Repetition.Interval = "PT30M"
         $task | Set-ScheduledTask
+
+     - name: Setup win-updates scheduled task
+       win_shell: |
+         $action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "C:\win-updates.ps1"
+         $trigger = New-ScheduledTaskTrigger -Weekly -At (Get-Date)
+         $description = "Run win-updates script once a week"
+         $principal = New-ScheduledTaskPrincipal -UserID "NT AUTHORITY\SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+         $task = Register-ScheduledTask -TaskName "Windows_Updates" -Trigger $trigger -Action $action -Description $description -Principal $principal
+         $task.Triggers.Repetition.Duration = "P60M"
+         $task.Triggers.Repetition.Interval = "PT1W"
+         $task | Set-ScheduledTask
 
     - name: Add entries into Windows hosts file
       win_lineinfile:
